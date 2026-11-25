@@ -82,35 +82,7 @@ let latestTranscript = '';
 
 function initSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    statusText.textContent = 'Speech recognition not supported.';
-  }
-}
-
-function createFreshRecognizer() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = 'en-US';
-
-  rec.onresult = (event) => {
-    let text = '';
-    for (let i = 0; i < event.results.length; i++) {
-      text += event.results[i][0].transcript;
-    }
-    latestTranscript = text.trim();
-    statusText.textContent = latestTranscript ? 'Listening: ' + latestTranscript : 'Listening...';
-  };
-
-  rec.onerror = (event) => {
-    if (event.error !== 'aborted' && event.error !== 'no-speech') {
-      statusText.textContent = 'Mic error: ' + event.error;
-    }
-  };
-
-
-  return rec;
+  if (!SR) statusText.textContent = 'Speech recognition not supported.';
 }
 
 function toggleRecording() {
@@ -127,44 +99,59 @@ function toggleRecording() {
 
 function startRecording() {
   window.speechSynthesis.cancel();
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  if (recognition) {
-    try { recognition.abort(); } catch (e) {}
+  if (sharedPlayer) {
+    sharedPlayer.pause();
   }
 
   latestTranscript = '';
   isRecording = true;
-  recognition = createFreshRecognizer();
 
-  try {
-    recognition.start();
-    micBtn.textContent = '⏹️ Tap to Send';
-    micBtn.classList.add('recording');
-    statusText.textContent = 'Listening... Speak now!';
-  } catch (e) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (event) => {
+    let text = '';
+    for (let i = 0; i < event.results.length; i++) {
+      text += event.results[i][0].transcript;
+    }
+    latestTranscript = text.trim();
+    statusText.textContent = latestTranscript ? 'Listening: ' + latestTranscript : 'Listening...';
+  };
+
+  recognition.onend = () => {
+    if (isRecording) {
+      isRecording = false;
+      resetMicUI();
+      if (latestTranscript) {
+        processUserMessage(latestTranscript);
+      } else {
+        statusText.textContent = 'Did not catch anything. Tap to try again!';
+      }
+    }
+  };
+
+  recognition.onerror = (event) => {
     isRecording = false;
-    statusText.textContent = 'Mic busy, tap again.';
-  }
+    resetMicUI();
+    if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      statusText.textContent = 'Mic error: ' + event.error;
+    }
+  };
+
+  recognition.start();
+  micBtn.textContent = '⏹️ Tap to Send';
+  micBtn.classList.add('recording');
+  statusText.textContent = 'Listening... Speak now!';
 }
 
 function stopRecording() {
-  isRecording = false;
+  unlockSafariAudio();
   if (recognition) {
     try { recognition.stop(); } catch (e) {}
   }
-  resetMicUI();
-
-  setTimeout(() => {
-    const spokenText = latestTranscript.trim();
-    if (spokenText) {
-      processUserMessage(spokenText);
-    } else {
-      statusText.textContent = 'Did not catch anything. Tap to try again!';
-    }
-  }, 500);
 }
 
 function resetMicUI() {
@@ -237,156 +224,27 @@ const response = await fetch(
 // ==========================================
 // 6. TEXT-TO-SPEECH & UI RENDERING
 // ==========================================
-let currentAudio = null;
+const sharedPlayer = new Audio();
+
+function unlockSafariAudio() {
+  sharedPlayer.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+  sharedPlayer.play().catch(() => {});
+}
 
 async function speakText(text) {
   window.speechSynthesis.cancel();
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
+  sharedPlayer.pause();
 
-  const engine = getVoiceEngine();
-
-  if (engine === 'gemini') {
+  if (getVoiceEngine() === 'gemini') {
     await playGeminiVoice(text);
-  } else if (engine === 'edge') {
-    await playEdgeVoice(text);
   } else {
     playAppleVoice(text);
   }
 }
 
 function playAppleVoice(text) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.98;
-  window.speechSynthesis.speak(utterance);
-}
-async function playGeminiVoice(text) {
-  try {
-    const host = ['generativelanguage', 'googleapis', 'com'].join('.');
-    const path = '/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
-    const res = await fetch('https://' + host + path, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': getApiKey()
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: text }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
-          }
-        }
-      })
-    });
-
-    const data = await res.json();
-    const audioB64 = data.candidates[0].content.parts[0].inlineData.data;
-    const wavUrl = makeWavFromPcm(audioB64, 24000);
-    currentAudio = new Audio(wavUrl);
-    await currentAudio.play();
-  } catch (e) {
-    console.error('Gemini TTS failed, falling back to Apple voice:', e);
-    playAppleVoice(text);
-  }
-}
-
-async function playEdgeVoice(text) {
-  const workerUrl = getEdgeUrl();
-  if (!workerUrl) {
-    playAppleVoice(text);
-    return;
-  }
-  try {
-    const res = await fetch(workerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, voice: 'en-US-JennyNeural' })
-    });
-    const blob = await res.blob();
-    currentAudio = new Audio(URL.createObjectURL(blob));
-    await currentAudio.play();
-  } catch (e) {
-    console.error('Edge TTS failed, falling back to Apple voice:', e);
-    playAppleVoice(text);
-  }
-}
-function makeWavFromPcm(base64Str, sampleRate) {
-  const raw = window.atob(base64Str);
-  const pcmLen = raw.length;
-  const wavBuf = new ArrayBuffer(44 + pcmLen);
-  const view = new DataView(wavBuf);
-
-  const putStr = (offset, s) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
-  };
-
-  putStr(0, 'RIFF');
-  view.setUint32(4, 36 + pcmLen, true);
-  putStr(8, 'WAVE');
-  putStr(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  putStr(36, 'data');
-  view.setUint32(40, pcmLen, true);
-
-  const bytes = new Uint8Array(wavBuf, 44);
-  for (let i = 0; i < pcmLen; i++) bytes[i] = raw.charCodeAt(i);
-
-  return URL.createObjectURL(new Blob([wavBuf], { type: 'audio/wav' }));
-}
-
-function appendMessage(text, className) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + className;
-  div.textContent = text;
-  chatContainer.appendChild(div);
-  scrollToBottom();
-}
-
-function appendGrammarFeedback(result) {
-  const div = document.createElement('div');
-  div.className = 'grammar-box';
-
-  const title = document.createElement('div');
-  if (result.has_mistakes) {
-    title.className = 'grammar-title';
-    title.textContent = '✍️ Grammar Check';
-    div.appendChild(title);
-
-    const better = document.createElement('div');
-    better.textContent = 'Better: "' + result.corrected + '"';
-    div.appendChild(better);
-
-    const exp = document.createElement('div');
-    exp.className = 'grammar-explanation';
-    exp.textContent = result.explanation;
-    div.appendChild(exp);
-  } else {
-    title.className = 'grammar-title perfect';
-    title.textContent = '✅ Grammar Check: Great job!';
-    div.appendChild(title);
-  }
-
-  chatContainer.appendChild(div);
-  scrollToBottom();
-}
-
-function clearChat() {
-  conversationHistory = [];
-  chatContainer.textContent = '';
-  appendMessage('Conversation cleared! Ready whenever you are.', 'ai-msg');
-}
-
-function scrollToBottom() {
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = 0.98;
+  window.speechSynthesis.speak(u);
 }
