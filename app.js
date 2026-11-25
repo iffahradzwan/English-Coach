@@ -233,47 +233,111 @@ const response = await fetch(
 // ==========================================
 // 6. TEXT-TO-SPEECH & UI RENDERING
 // ==========================================
-function speakText(text) {
+let currentAudio = null;
+
+async function speakText(text) {
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 1.0;
-  window.speechSynthesis.speak(utterance);
-}
-
-function appendMessage(text, className) {
-  const div = document.createElement('div');
-  div.className = `msg ${className}`;
-  div.innerText = text;
-  chatContainer.appendChild(div);
-  scrollToBottom();
-}
-
-function appendGrammarFeedback(result) {
-  const div = document.createElement('div');
-  div.className = 'grammar-box';
-
-  if (result.has_mistakes) {
-    div.innerHTML = `
-      <div class="grammar-title">✍️ Grammar Check</div>
-      <div><strong>Better:</strong> "${result.corrected}"</div>
-      <div class="grammar-explanation">${result.explanation}</div>
-    `;
-  } else {
-    div.innerHTML = `
-      <div class="grammar-title perfect">✅ Grammar Check: Great job!</div>
-    `;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
   }
 
-  chatContainer.appendChild(div);
-  scrollToBottom();
+  const engine = getVoiceEngine();
+
+  if (engine === 'gemini') {
+    await playGeminiVoice(text);
+  } else if (engine === 'edge') {
+    await playEdgeVoice(text);
+  } else {
+    playAppleVoice(text);
+  }
 }
 
-function clearChat() {
-  conversationHistory = [];
-  chatContainer.innerHTML = '<div class="msg ai-msg">Conversation cleared! Ready whenever you are.</div>';
+function playAppleVoice(text) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.98;
+  window.speechSynthesis.speak(utterance);
+}
+async function playGeminiVoice(text) {
+  try {
+    const host = ['generativelanguage', 'googleapis', 'com'].join('.');
+    const path = '/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
+    const res = await fetch('https://' + host + path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': getApiKey()
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+          }
+        }
+      })
+    });
+
+    const data = await res.json();
+    const audioB64 = data.candidates[0].content.parts[0].inlineData.data;
+    const wavUrl = makeWavFromPcm(audioB64, 24000);
+    currentAudio = new Audio(wavUrl);
+    await currentAudio.play();
+  } catch (e) {
+    console.error('Gemini TTS failed, falling back to Apple voice:', e);
+    playAppleVoice(text);
+  }
 }
 
-function scrollToBottom() {
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+async function playEdgeVoice(text) {
+  const workerUrl = getEdgeUrl();
+  if (!workerUrl) {
+    playAppleVoice(text);
+    return;
+  }
+  try {
+    const res = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, voice: 'en-US-JennyNeural' })
+    });
+    const blob = await res.blob();
+    currentAudio = new Audio(URL.createObjectURL(blob));
+    await currentAudio.play();
+  } catch (e) {
+    console.error('Edge TTS failed, falling back to Apple voice:', e);
+    playAppleVoice(text);
+  }
 }
+function makeWavFromPcm(base64Str, sampleRate) {
+  const raw = window.atob(base64Str);
+  const pcmLen = raw.length;
+  const wavBuf = new ArrayBuffer(44 + pcmLen);
+  const view = new DataView(wavBuf);
+
+  const putStr = (offset, s) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+
+  putStr(0, 'RIFF');
+  view.setUint32(4, 36 + pcmLen, true);
+  putStr(8, 'WAVE');
+  putStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  putStr(36, 'data');
+  view.setUint32(40, pcmLen, true);
+
+  const bytes = new Uint8Array(wavBuf, 44);
+  for (let i = 0; i < pcmLen; i++) bytes[i] = raw.charCodeAt(i);
+
+  return URL.createObjectURL(new Blob([wavBuf], { type: 'audio/wav' }));
+}
+
