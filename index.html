@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SpeakCoach">
+  <title>SpeakCoach AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header>
+    <h1>🎙️ SpeakCoach AI</h1>
+    <div class="header-actions">
+      <button id="clear-btn" class="icon-btn">Clear</button>
+      <button id="settings-btn" class="icon-btn">⚙️ Key</button>
+    </div>
+  </header>
+
+  <!-- Chat & Grammar Feed -->
+  <main id="chat-container">
+    <div class="msg ai-msg">
+      Hi! Tap the button below and start speaking in English. I'll reply naturally and quietly check your grammar below your messages!
+    </div>
+  </main>
+
+  <!-- Bottom Microphone Controls -->
+  <footer class="controls">
+    <div id="status">Tap below to start speaking</div>
+    <button id="mic-btn">🎤 Tap to Speak</button>
+  </footer>
+
+  <!-- Private API Key Modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-content">
+      <h2>🔑 Gemini API Key</h2>
+      <p class="modal-desc">
+        Your key is saved privately on your device only and never uploaded to GitHub.
+      </p>
+      <input type="password" id="api-key-input" placeholder="Paste your AIza... key here">
+      <div class="modal-actions">
+        <button id="close-modal-btn" class="secondary-btn">Cancel</button>
+        <button id="save-key-btn" class="primary-btn">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
