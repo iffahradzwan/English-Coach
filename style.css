@@ -235,4 +235,21 @@
     background: #334155;
     color: var(--text);
   }
-  
+  .modal-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-top: 10px;
+}
+
+.modal-content select {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0 12px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: var(--bg);
+  color: white;
+  font-size: 0.95rem;
+}
