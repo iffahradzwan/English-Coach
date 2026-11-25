@@ -113,6 +113,64 @@ function createFreshRecognizer() {
   return rec;
 }
 
+function toggleRecording() {
+  if (!getApiKey()) {
+    openSettings();
+    return;
+  }
+  if (!isRecording) {
+    startRecording();
+  } else {
+    stopRecording();
+  }
+}
+
+function startRecording() {
+  window.speechSynthesis.cancel();
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if (recognition) {
+    try { recognition.abort(); } catch (e) {}
+  }
+
+  latestTranscript = '';
+  isRecording = true;
+  recognition = createFreshRecognizer();
+
+  try {
+    recognition.start();
+    micBtn.textContent = '⏹️ Tap to Send';
+    micBtn.classList.add('recording');
+    statusText.textContent = 'Listening... Speak now!';
+  } catch (e) {
+    isRecording = false;
+    statusText.textContent = 'Mic busy, tap again.';
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (recognition) {
+    try { recognition.stop(); } catch (e) {}
+  }
+  resetMicUI();
+
+  setTimeout(() => {
+    const spokenText = latestTranscript.trim();
+    if (spokenText) {
+      processUserMessage(spokenText);
+    } else {
+      statusText.textContent = 'Did not catch anything. Tap to try again!';
+    }
+  }, 500);
+}
+
+function resetMicUI() {
+  micBtn.textContent = '🎤 Tap to Speak';
+  micBtn.classList.remove('recording');
+}
 
 // ==========================================
 // 5. GEMINI AI & GRAMMAR CHECKER
