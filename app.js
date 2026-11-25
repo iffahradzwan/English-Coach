@@ -29,9 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // 3. API KEY & SETTINGS MANAGEMENT
 // ==========================================
-// ==========================================
-// 3. API KEY & SETTINGS MANAGEMENT
-// ==========================================
 const voiceSelect = document.getElementById('voice-engine-select');
 const edgeUrlGroup = document.getElementById('edge-url-group');
 const edgeUrlInput = document.getElementById('edge-url-input');
@@ -81,92 +78,46 @@ function saveApiKey() {
 // ==========================================
 // 4. SPEECH-TO-TEXT (MICROPHONE)
 // ==========================================
+let latestTranscript = '';
+
 function initSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    statusText.innerText = '⚠️ Speech recognition not supported. Please use Safari or Chrome.';
-    return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    statusText.textContent = 'Speech recognition not supported.';
   }
+}
 
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
+function createFreshRecognizer() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
 
-  recognition.onresult = (event) => {
-    let interim = '';
-    let currentFinal = '';
-
+  rec.onresult = (event) => {
+    let text = '';
     for (let i = 0; i < event.results.length; i++) {
-      const result = event.results[i];
-      const text = result && result[0] && result[0].transcript ? result[0].transcript : '';
-      if (result.isFinal) {
-        currentFinal += text + ' ';
-      } else {
-        interim += text;
-      }
+      text += event.results[i].transcript;
     }
-
-    finalTranscript = currentFinal;
-    const display = (finalTranscript + interim).trim();
-    statusText.innerText = display ? 'Listening: ' + display : 'Listening... Speak now!';
+    latestTranscript = text.trim();
+    statusText.textContent = latestTranscript ? 'Listening: ' + latestTranscript : 'Listening...';
   };
 
-  recognition.onerror = (event) => {
-    console.error('Speech error:', event.error);
-    resetMicUI();
-    statusText.innerText = 'Mic error: ' + event.error;
-  };
-}
-
-function toggleRecording() {
-  if (!getApiKey()) {
-    openSettings();
-    return;
-  }
-
-  if (!isRecording) {
-    startRecording();
-  } else {
-    stopRecording();
-  }
-}
-
-function startRecording() {
-  window.speechSynthesis.cancel();
-  finalTranscript = '';
-  isRecording = true;
-
-  try {
-    recognition.start();
-    micBtn.innerText = '⏹️ Tap to Send';
-    micBtn.classList.add('recording');
-    statusText.innerText = 'Listening... Speak now!';
-  } catch (e) {
-    console.error(e);
-    isRecording = false;
-  }
-}
-
-function stopRecording() {
-  isRecording = false;
-  recognition.stop();
-  resetMicUI();
-
-  setTimeout(() => {
-    const spokenText = finalTranscript.trim();
-    if (spokenText) {
-      processUserMessage(spokenText);
-    } else {
-      statusText.innerText = 'Did not catch anything. Tap to try again!';
+  rec.onerror = (event) => {
+    if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      statusText.textContent = 'Mic error: ' + event.error;
     }
-  }, 500);
+  };
+
+  rec.onend = () => {
+    if (isRecording) {
+      try { rec.start(); } catch (e) {}
+    }
+  };
+
+  return rec;
 }
 
-function resetMicUI() {
-  micBtn.innerText = '🎤 Tap to Speak';
-  micBtn.classList.remove('recording');
-}
 
 // ==========================================
 // 5. GEMINI AI & GRAMMAR CHECKER
