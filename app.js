@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // 3. API KEY & SETTINGS MANAGEMENT
 // ==========================================
 function getApiKey() {
-  return (localStorage.getItem('gemini_api_key') || '').trim();
+  // Remove any accidental spaces or invisible line breaks from copy-pasting on iPhone
+  return (localStorage.getItem('gemini_api_key') || '').replace(/\s+/g, '');
 }
 
 function openSettings() {
@@ -43,9 +44,9 @@ function closeSettings() {
 }
 
 function saveApiKey() {
-  const key = apiKeyInput.value.trim();
-  if (!key) {
-    alert('Please enter a valid Gemini API key.');
+  const key = apiKeyInput.value.replace(/\s+/g, '');
+  if (!key || !key.startsWith('AIza')) {
+    alert('Please paste a valid Gemini API key (starts with AIza...).');
     return;
   }
   localStorage.setItem('gemini_api_key', key);
@@ -59,7 +60,7 @@ function saveApiKey() {
 function initSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    statusText.innerText = '⚠️ Speech recognition not supported. Please use Chrome or Safari.';
+    statusText.innerText = '⚠️ Speech recognition not supported. Please use Safari or Chrome.';
     return;
   }
 
@@ -74,7 +75,7 @@ function initSpeechRecognition() {
 
     for (let i = 0; i < event.results.length; i++) {
       const result = event.results[i];
-      const text = result[0] && result[0].transcript ? result[0].transcript : '';
+      const text = result && result[0] && result[0].transcript ? result[0].transcript : '';
       if (result.isFinal) {
         currentFinal += text + ' ';
       } else {
@@ -163,7 +164,7 @@ async function processUserMessage(userText) {
   conversationHistory.push({ role: "user", parts: [{ text: userText }] });
 
   try {
-    const apiKey = encodeURIComponent(getApiKey());
+    const apiKey = getApiKey();
     const response = await fetch(
       `https://googleapis.com{apiKey}`,
       {
@@ -192,7 +193,9 @@ async function processUserMessage(userText) {
 
   } catch (err) {
     console.error('Fetch error details:', err);
-    statusText.innerText = 'Error: ' + err.message + ' (Check internet or API Key)';
+    // Remove failed message from history so conversation stays clean
+    conversationHistory.pop();
+    statusText.innerText = 'Error: ' + err.message;
   }
 }
 
