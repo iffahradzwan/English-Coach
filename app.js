@@ -45,7 +45,7 @@ function closeSettings() {
 
 function saveApiKey() {
   const key = apiKeyInput.value.replace(/\s+/g, '');
-  if (!key || !key.startsWith('AIza')) {
+ if (!key) {
     alert('Please paste a valid Gemini API key (starts with AIza...).');
     return;
   }
@@ -165,13 +165,17 @@ async function processUserMessage(userText) {
 
   try {
   const apiKey = getApiKey();
-const baseUrl = 'https://generativelanguage.' + '://googleapis.com';
+const host = ['generativelanguage', 'googleapis', 'com'].join('.');
+const path = '/v1beta/models/gemini-3.5-flash-lite:generateContent';
 const response = await fetch(
-  baseUrl + apiKey,
+  'https://' + host + path,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey
+    },
 
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: conversationHistory,
