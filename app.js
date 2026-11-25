@@ -234,17 +234,58 @@ function unlockSafariAudio() {
 async function speakText(text) {
   window.speechSynthesis.cancel();
   sharedPlayer.pause();
-
-  if (getVoiceEngine() === 'gemini') {
-    await playGeminiVoice(text);
-  } else {
-    playAppleVoice(text);
-  }
+  playAppleVoice(text);
 }
+
 
 function playAppleVoice(text) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = 0.98;
   window.speechSynthesis.speak(u);
+}
+function appendMessage(text, className) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + className;
+  div.textContent = text;
+  if (className === 'ai-msg') {
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', () => speakText(text));
+  }
+  chatContainer.appendChild(div);
+  scrollToBottom();
+}
+
+function appendGrammarFeedback(result) {
+  const div = document.createElement('div');
+  div.className = 'grammar-box';
+  const title = document.createElement('div');
+  if (result.has_mistakes) {
+    title.className = 'grammar-title';
+    title.textContent = 'Grammar Check';
+    div.appendChild(title);
+    const better = document.createElement('div');
+    better.textContent = 'Better: ' + result.corrected;
+    div.appendChild(better);
+    const exp = document.createElement('div');
+    exp.className = 'grammar-explanation';
+    exp.textContent = result.explanation;
+    div.appendChild(exp);
+  } else {
+    title.className = 'grammar-title perfect';
+    title.textContent = 'Grammar Check: Great job!';
+    div.appendChild(title);
+  }
+  chatContainer.appendChild(div);
+  scrollToBottom();
+}
+
+function clearChat() {
+  conversationHistory = [];
+  chatContainer.textContent = '';
+  appendMessage('Conversation cleared! Ready whenever you are.', 'ai-msg');
+}
+
+function scrollToBottom() {
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
