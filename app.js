@@ -90,7 +90,7 @@ function initSpeechRecognition() {
 function createFreshRecognizer() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const rec = new SR();
-  rec.continuous = false;
+  rec.continuous = true;
   rec.interimResults = true;
   rec.lang = 'en-US';
 
@@ -109,11 +109,6 @@ function createFreshRecognizer() {
     }
   };
 
-  rec.onend = () => {
-    if (isRecording) {
-      try { rec.start(); } catch (e) {}
-    }
-  };
 
   return rec;
 }
