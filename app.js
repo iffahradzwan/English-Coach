@@ -164,9 +164,11 @@ async function processUserMessage(userText) {
   conversationHistory.push({ role: "user", parts: [{ text: userText }] });
 
   try {
-    const apiKey = getApiKey();
-    const response = await fetch(
-      `https://googleapis.com{apiKey}`,
+  const apiKey = getApiKey();
+const baseUrl = 'https://generativelanguage.' + '://googleapis.com';
+const response = await fetch(
+  baseUrl + apiKey,
+
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
