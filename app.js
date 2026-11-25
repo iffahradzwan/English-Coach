@@ -29,13 +29,34 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // 3. API KEY & SETTINGS MANAGEMENT
 // ==========================================
+// ==========================================
+// 3. API KEY & SETTINGS MANAGEMENT
+// ==========================================
+const voiceSelect = document.getElementById('voice-engine-select');
+const edgeUrlGroup = document.getElementById('edge-url-group');
+const edgeUrlInput = document.getElementById('edge-url-input');
+
+voiceSelect.addEventListener('change', () => {
+  edgeUrlGroup.style.display = voiceSelect.value === 'edge' ? 'block' : 'none';
+});
+
 function getApiKey() {
-  // Remove any accidental spaces or invisible line breaks from copy-pasting on iPhone
   return (localStorage.getItem('gemini_api_key') || '').replace(/\s+/g, '');
+}
+
+function getVoiceEngine() {
+  return localStorage.getItem('voice_engine') || 'gemini';
+}
+
+function getEdgeUrl() {
+  return (localStorage.getItem('edge_worker_url') || '').trim();
 }
 
 function openSettings() {
   apiKeyInput.value = getApiKey();
+  voiceSelect.value = getVoiceEngine();
+  edgeUrlInput.value = getEdgeUrl();
+  edgeUrlGroup.style.display = voiceSelect.value === 'edge' ? 'block' : 'none';
   settingsModal.style.display = 'flex';
 }
 
@@ -45,14 +66,17 @@ function closeSettings() {
 
 function saveApiKey() {
   const key = apiKeyInput.value.replace(/\s+/g, '');
- if (!key) {
-    alert('Please paste a valid Gemini API key (starts with AIza...).');
+  if (!key) {
+    alert('Please paste a valid Gemini API key.');
     return;
   }
   localStorage.setItem('gemini_api_key', key);
+  localStorage.setItem('voice_engine', voiceSelect.value);
+  localStorage.setItem('edge_worker_url', edgeUrlInput.value.trim());
   closeSettings();
-  statusText.innerText = 'API Key saved! Tap below to speak.';
+  statusText.innerText = 'Settings saved! Tap below to speak.';
 }
+
 
 // ==========================================
 // 4. SPEECH-TO-TEXT (MICROPHONE)
@@ -151,14 +175,15 @@ async function processUserMessage(userText) {
   appendMessage(userText, 'user-msg');
   statusText.innerText = 'Thinking & checking grammar...';
 
-  const systemInstruction = `You are a friendly English conversation partner and silent grammar coach.
-  The user is speaking to you to practice English.
+   const systemInstruction = `You are a friendly English conversation partner and silent grammar coach.
+  The user is speaking aloud to practice English.
+  IMPORTANT: Completely ignore missing punctuation, commas, periods, or capitalization because the input comes from speech-to-text. Only mark "has_mistakes": true if there is an actual spoken grammar, tense, vocabulary, or phrasing error.
   Respond ONLY in valid JSON with this exact structure:
   {
     "reply": "Your natural, conversational response to keep the chat going (do NOT mention their grammar mistakes here).",
     "has_mistakes": true,
     "corrected": "The corrected version of what the user said (or 'Perfect!' if no mistakes)",
-    "explanation": "A short, friendly 1-sentence explanation of the grammar fix (or empty string if none)."
+    "explanation": "A short, friendly 1-sentence explanation of the spoken grammar fix (or empty string if none)."
   }`;
 
   conversationHistory.push({ role: "user", parts: [{ text: userText }] });
