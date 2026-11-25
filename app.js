@@ -97,7 +97,7 @@ function createFreshRecognizer() {
   rec.onresult = (event) => {
     let text = '';
     for (let i = 0; i < event.results.length; i++) {
-      text += event.results[i].transcript;
+      text += event.results[i][0].transcript;
     }
     latestTranscript = text.trim();
     statusText.textContent = latestTranscript ? 'Listening: ' + latestTranscript : 'Listening...';
